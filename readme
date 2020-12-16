@@ -1,0 +1,9 @@
+first commit
+STGCN
+use_gpu = False
+num_timesteps_input = 12
+num_timesteps_output = 3
+
+
+epochs = 100
+batch_size = 30
