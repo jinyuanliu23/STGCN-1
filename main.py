@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 
+from sklearn import metrics
 from stgcn import STGCN
 from utils import generate_dataset, load_metr_la_data, get_normalized_adj
 
@@ -17,15 +18,22 @@ num_timesteps_output = 3
 epochs = 1000
 batch_size = 50
 
+
+
 parser = argparse.ArgumentParser(description='STGCN')
 parser.add_argument('--enable-cuda', action='store_true',
-                    help='Enable CUDA')
+                    help='Enable CUDA',default='True')
 args = parser.parse_args()
 args.device = None
 if args.enable_cuda and torch.cuda.is_available():
     args.device = torch.device('cuda')
 else:
     args.device = torch.device('cpu')
+# def mape(y_true, y_pred):
+#     return np.mean(np.abs((y_pred - y_true) / y_true))
+def mape(labels,preds):
+    mask=labels!=0
+    return np.fabs((labels[mask]-preds[mask])/labels[mask]).mean()
 
 
 def train_epoch(training_input, training_target, batch_size):
@@ -96,6 +104,9 @@ if __name__ == '__main__':
     training_losses = []
     validation_losses = []
     validation_maes = []
+    validation_rmses = []
+    validation_mapes = []
+
     for epoch in range(epochs):
         loss = train_epoch(training_input, training_target,
                            batch_size=batch_size)
@@ -115,7 +126,19 @@ if __name__ == '__main__':
             target_unnormalized = val_target.detach().cpu().numpy()*stds[0]+means[0]
             mae = np.mean(np.absolute(out_unnormalized - target_unnormalized))
             validation_maes.append(mae)
+            rmse = np.sqrt((np.mean(np.absolute(np.square(out_unnormalized - target_unnormalized)))))
+            # np.sqrt(metrics.mean_squared_error(y_true, y_pred))
+            validation_rmses.append(rmse)
 
+
+            # try:
+            #     mape = mape( target_unnormalized, out_unnormalized)
+            # except:
+            #     print('none')
+
+
+
+            validation_mapes.append(mape)
             out = None
             val_input = val_input.to(device="cpu")
             val_target = val_target.to(device="cpu")
@@ -123,10 +146,20 @@ if __name__ == '__main__':
         print("Training loss: {}".format(training_losses[-1]))
         print("Validation loss: {}".format(validation_losses[-1]))
         print("Validation MAE: {}".format(validation_maes[-1]))
+        print("Validation RMSE: {}".format(validation_rmses[-1]))
+        print("Validation MAPE: {}".format(validation_mapes[-1]))
         plt.plot(training_losses, label="training loss")
         plt.plot(validation_losses, label="validation loss")
+
+        # print("out_unnormalized: {}".format(out_unnormalized[-1]))
+        # print("target_unnormalized: {}".format(target_unnormalized[-1]))
+        # plt.plot(out_unnormalized[-1],label='pridiction')
+        # plt.plot(target_unnormalized[-1],label='true')
+
         plt.legend()
         plt.show()
+
+
 
         checkpoint_path = "checkpoints/"
         if not os.path.exists(checkpoint_path):

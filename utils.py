@@ -52,8 +52,8 @@ def generate_dataset(X, num_timesteps_input, num_timesteps_output):
     # Generate the beginning index and the ending index of a sample, which
     # contains (num_points_for_training + num_points_for_predicting) points
     indices = [(i, i + (num_timesteps_input + num_timesteps_output)) for i
-               in range(X.shape[2] - (
-                num_timesteps_input + num_timesteps_output) + 1)]
+               in range(0, (X.shape[2] - (num_timesteps_input + num_timesteps_output) + 1),
+                        (num_timesteps_input + num_timesteps_output))]
 
     # Save samples
     features, target = [], []
