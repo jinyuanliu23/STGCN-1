@@ -24,7 +24,7 @@ class TimeBlock(nn.Module):
         each time step.
         :param kernel_size: Size of the 1D temporal kernel.
         """
-        a =(0,1)
+        a =(0,2)
         super(TimeBlock, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, (1, kernel_size),padding=a)
         self.conv2 = nn.Conv2d(in_channels, out_channels, (1, kernel_size),padding=a)
@@ -128,8 +128,11 @@ class STGCN(nn.Module):
                                  spatial_channels=16, num_nodes=num_nodes)
         self.block3 = STGCNBlock(in_channels=64, out_channels=64,
                                  spatial_channels=16, num_nodes=num_nodes)
+
+        self.block4 = STGCNBlock(in_channels=64, out_channels=64,
+                                 spatial_channels=16, num_nodes=num_nodes)
         self.last_temporal = TimeBlock(in_channels=64, out_channels=64)
-        self.fully = nn.Linear((num_timesteps_input ) * 64,
+        self.fully = nn.Linear((num_timesteps_input +16) * 64,
                                num_timesteps_output)
 
     def forward(self, A_hat, X):
@@ -143,10 +146,11 @@ class STGCN(nn.Module):
         # print(A_hat.size())
         out2 = self.block2(out1, A_hat)
         out3 = self.block3(out2, A_hat)
-        out4 = self.last_temporal(out3)
-        out5 = self.fully(out4.reshape((out4.shape[0], out4.shape[1], -1)))
+        out4 = self.block3(out3, A_hat)
+        out5 = self.last_temporal(out4)
+        out6 = self.fully(out4.reshape((out5.shape[0], out5.shape[1], -1)))
 
-        return out5
+        return out6
 # class STGCN(nn.Module):
 #     """
 #     Spatio-temporal graph convolutional network as described in

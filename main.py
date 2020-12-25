@@ -15,10 +15,9 @@ use_gpu = True
 num_timesteps_input = 12
 num_timesteps_output = 3
 
-epochs = 1000
+epochs = 900
 batch_size = 50
-
-
+LR=1e-3
 
 parser = argparse.ArgumentParser(description='STGCN')
 parser.add_argument('--enable-cuda', action='store_true',
@@ -98,7 +97,7 @@ if __name__ == '__main__':
                 num_timesteps_input,
                 num_timesteps_output).to(device=args.device)
 
-    optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(net.parameters(), lr=LR)
     loss_criterion = nn.MSELoss()
 
     training_losses = []
