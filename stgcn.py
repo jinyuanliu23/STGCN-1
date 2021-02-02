@@ -24,7 +24,7 @@ class TimeBlock(nn.Module):
         each time step.
         :param kernel_size: Size of the 1D temporal kernel.
         """
-        a =(0,2)
+        a =(0,1)
         super(TimeBlock, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, (1, kernel_size),padding=a)
         self.conv2 = nn.Conv2d(in_channels, out_channels, (1, kernel_size),padding=a)
@@ -44,6 +44,13 @@ class TimeBlock(nn.Module):
         # Convert back from NCHW to NHWC
         out = out.permute(0, 2, 3, 1)
         return out
+
+
+
+
+
+
+
 
 
 class STGCNBlock(nn.Module):
@@ -71,6 +78,7 @@ class STGCNBlock(nn.Module):
                                                      spatial_channels))
         self.temporal2 = TimeBlock(in_channels=spatial_channels,
                                    out_channels=out_channels)
+        # self.LSTMBlock=LSTMBlock()
         self.batch_norm = nn.BatchNorm2d(num_nodes)
         self.reset_parameters()
 
@@ -99,8 +107,61 @@ class STGCNBlock(nn.Module):
         # t2 = F.relu(torch.einsum("ijkl,lp->ijkp", [lfs, self.Theta1]))
         t2 = F.relu(torch.matmul(lfs, self.Theta1))
         t3 = self.temporal2(t2)
+
         return self.batch_norm(t3)
         # return t3
+
+class LSTMBlock(nn.Module):
+    def __init__(self, in_channels, hidden_dim, n_layer, out_channels):
+        super(LSTMBlock, self).__init__()
+        self.n_layer = n_layer
+        self.hidden_dim = hidden_dim
+        self.lstm = nn.LSTM(in_channels, hidden_dim, n_layer, batch_first=True)
+        self.classifier = nn.Linear(in_channels, out_channels)
+        # 默认输入数据格式:
+        # input(seq_len, batch_size, input_size)
+        # h0(num_layers * num_directions, batch_size, hidden_size)
+        # c0(num_layers * num_directions, batch_size, hidden_size)
+        # 默认输出数据格式：
+        # output(seq_len, batch_size, hidden_size * num_directions)
+        # hn(num_layers * num_directions, batch_size, hidden_size)
+        # cn(num_layers * num_directions, batch_size, hidden_size)
+
+        # batch_first=True 在此条件下，batch_size是处在第一个维度的。
+        """
+             # :param X: Input data of shape (batch_size, num_nodes, num_timesteps,
+             # num_features=in_channels)
+             # :return: Output data of shape (batch_size, num_nodes,
+             # num_timesteps_out, num_features_out=out_channels)
+             # """
+
+    def forward(self, x):
+        # print(x.size())
+        # x.size()
+        ## Batchsize x N-Nodes x TimeStep x Channel => TimeStep x Batchsize x N-Nodes x Channel
+        x = x.permute(2,0,1,3)
+        # print(x.size())
+        # x = x.reshape([x.shape[0], x.shape[1] ,x.shape[3] * x.shape[2]])
+        # x = x.reshape([x.shape[0], x.shape[1] * x.shape[2], x.shape[3]])
+        t, b, n, c =  x.shape
+        x = x.reshape(t, b*n, c)
+        # x = x.reshape([x.shape[0], x.shape[1] , x.shape[3]])
+        # print(x.size())
+        # x = x.reshape([x.shape[0], -1, x.shape[3]])
+        # x = x.resize(,x.shape[2],x.shape[3])
+        # x = x.permute(1,0,2)
+        out, (h_n, c_n) = self.lstm(x)
+        ## TimeStep x Batchsize x N-Nodes x Channel => Batchsize x N-Nodes x TimeStep x Channel
+        out = out.reshape(t, b, n, c)
+        out = out.permute(1, 2, 0, 3)
+        # print(out.size())
+            # 此时可以从out中获得最终输出的状态h
+            # x = out[:, -1, :]
+        # x = h_n[-1, :, :]
+        # x = self.classifier(x)
+
+        return out
+
 
 
 class STGCN(nn.Module):
@@ -128,12 +189,11 @@ class STGCN(nn.Module):
                                  spatial_channels=16, num_nodes=num_nodes)
         self.block3 = STGCNBlock(in_channels=64, out_channels=64,
                                  spatial_channels=16, num_nodes=num_nodes)
-
-        self.block4 = STGCNBlock(in_channels=64, out_channels=64,
-                                 spatial_channels=16, num_nodes=num_nodes)
         self.last_temporal = TimeBlock(in_channels=64, out_channels=64)
-        self.fully = nn.Linear((num_timesteps_input +16) * 64,
+        self.LSTMBlock = LSTMBlock(in_channels=64, hidden_dim=64 , n_layer=3 ,out_channels= 64)
+        self.fully = nn.Linear((num_timesteps_input) * 64,
                                num_timesteps_output)
+
 
     def forward(self, A_hat, X):
         """
@@ -146,11 +206,26 @@ class STGCN(nn.Module):
         # print(A_hat.size())
         out2 = self.block2(out1, A_hat)
         out3 = self.block3(out2, A_hat)
-        out4 = self.block3(out3, A_hat)
-        out5 = self.last_temporal(out4)
-        out6 = self.fully(out4.reshape((out5.shape[0], out5.shape[1], -1)))
+        # print(out3.size())
 
+
+        # out4 = self.last_temporal(out3)
+        # print(out4.size())
+        # out5 = self.fully(out4.reshape((out4.shape[0], out4.shape[1], -1)))
+        # print(out5.size())
+        # return out5
+        out4 = self.last_temporal(out3)
+        # print(out4.size())
+        out5 = self.LSTMBlock(out4)
+        # print(out5.size())
+        # out6 = self.fully(out5.reshape((out5.shape[1], 4,out5.shape[0],64)))
+
+        out6 = self.fully(out5.reshape((out5.shape[0], out5.shape[1], -1)))
+        # print(out6.size())
+        # out6 = self.fully(out5)
         return out6
+
+
 # class STGCN(nn.Module):
 #     """
 #     Spatio-temporal graph convolutional network as described in

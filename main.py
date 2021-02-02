@@ -4,6 +4,7 @@ import pickle as pk
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+# torch.backends.cudnn.enabled = False
 import torch.nn as nn
 
 from sklearn import metrics
@@ -15,15 +16,17 @@ use_gpu = True
 num_timesteps_input = 12
 num_timesteps_output = 3
 
-epochs = 900
-batch_size = 50
-LR=1e-3
+epochs = 1000
+batch_size = 128
+
+# torch.cuda.set_device(0)
 
 parser = argparse.ArgumentParser(description='STGCN')
 parser.add_argument('--enable-cuda', action='store_true',
                     help='Enable CUDA',default='True')
 args = parser.parse_args()
 args.device = None
+
 if args.enable_cuda and torch.cuda.is_available():
     args.device = torch.device('cuda')
 else:
@@ -97,7 +100,7 @@ if __name__ == '__main__':
                 num_timesteps_input,
                 num_timesteps_output).to(device=args.device)
 
-    optimizer = torch.optim.Adam(net.parameters(), lr=LR)
+    optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
     loss_criterion = nn.MSELoss()
 
     training_losses = []
